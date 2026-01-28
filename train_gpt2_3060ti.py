@@ -298,6 +298,9 @@ class Hyperparameters:
     cooldown_iters: int = 2560  # Scaled from 640 proportionally (640 * 7000/1750)
     val_every: int = 250        # Evaluate validation loss periodically
     val_steps: int = 8          # Number of val batches to average
+    checkpoint_every: int = 500 # Save checkpoint every N steps
+    checkpoint_dir: str = 'checkpoints'  # Directory for checkpoints
+    resume_from: str = None     # Path to checkpoint to resume from
 
 def _load_data_shard(filename):
     with open(filename, "rb") as f:
@@ -411,7 +414,57 @@ def get_lr(it):
 schedulers = [torch.optim.lr_scheduler.LambdaLR(opt, get_lr) for opt in optimizers]
 
 # -----------------------------------------------------------------------------
-# 6. Validation
+# 6. Checkpointing
+# -----------------------------------------------------------------------------
+os.makedirs(args.checkpoint_dir, exist_ok=True)
+
+def save_checkpoint(step, best_val_loss):
+    checkpoint = {
+        'step': step,
+        'best_val_loss': best_val_loss,
+        'model_state_dict': model._orig_mod.state_dict() if hasattr(model, '_orig_mod') else model.state_dict(),
+        'opt_matrix_state': opt_matrix.state_dict(),
+        'opt_scalar_state': opt_scalar.state_dict(),
+        'opt_wte_state': opt_wte.state_dict(),
+        'opt_head_state': opt_head.state_dict(),
+    }
+    path = os.path.join(args.checkpoint_dir, f'checkpoint_{step:06d}.pt')
+    torch.save(checkpoint, path)
+    # Also save as 'latest' for easy resume
+    torch.save(checkpoint, os.path.join(args.checkpoint_dir, 'latest.pt'))
+    print(f"Saved checkpoint at step {step}")
+
+def load_checkpoint(path):
+    checkpoint = torch.load(path, map_location='cuda')
+    if hasattr(model, '_orig_mod'):
+        model._orig_mod.load_state_dict(checkpoint['model_state_dict'])
+    else:
+        model.load_state_dict(checkpoint['model_state_dict'])
+    opt_matrix.load_state_dict(checkpoint['opt_matrix_state'])
+    opt_scalar.load_state_dict(checkpoint['opt_scalar_state'])
+    opt_wte.load_state_dict(checkpoint['opt_wte_state'])
+    opt_head.load_state_dict(checkpoint['opt_head_state'])
+    return checkpoint['step'], checkpoint.get('best_val_loss', float('inf'))
+
+start_step = 0
+best_val_loss = float('inf')
+
+# Auto-resume from latest checkpoint if it exists
+latest_ckpt = os.path.join(args.checkpoint_dir, 'latest.pt')
+if args.resume_from:
+    start_step, best_val_loss = load_checkpoint(args.resume_from)
+    print(f"Resumed from {args.resume_from} at step {start_step}, best_val_loss={best_val_loss:.4f}")
+elif os.path.exists(latest_ckpt):
+    start_step, best_val_loss = load_checkpoint(latest_ckpt)
+    print(f"Auto-resumed from latest checkpoint at step {start_step}, best_val_loss={best_val_loss:.4f}")
+
+# Update schedulers to correct position
+for sched in schedulers:
+    for _ in range(start_step):
+        sched.step()
+
+# -----------------------------------------------------------------------------
+# 7. Validation
 # -----------------------------------------------------------------------------
 @torch.no_grad()
 def evaluate_val():
@@ -440,13 +493,13 @@ print(f"GPU: RTX 3060 Ti (8GB)")
 print(f"Config: batch_size={args.batch_size}, seq_len={args.sequence_length}, iters={args.num_iterations}")
 print(f"Tokens per step: {args.batch_size * args.sequence_length:,}")
 print(f"Total tokens: {args.batch_size * args.sequence_length * args.num_iterations / 1e6:.1f}M")
-print(f"Val every {args.val_every} steps")
+print(f"Val every {args.val_every} steps, checkpoint every {args.checkpoint_every} steps")
+if start_step > 0:
+    print(f"Resuming from step {start_step}")
 print()
 print("Step\tLoss\tValLoss\tTime(ms)\tkt/s\tWindow\tETA(m)")
 
-best_val_loss = float('inf')
-
-for step in range(args.num_iterations + 1):
+for step in range(start_step, args.num_iterations + 1):
     # Dynamic Window Schedule - scaled for shorter sequences
     # Original: 256 -> 1792 over training. Keep same range but capped at seq_length
     window = 256 * ((step / args.num_iterations * (1792 - 256) + 256) // 256)
@@ -492,8 +545,15 @@ for step in range(args.num_iterations + 1):
     print(f"{step+1}\t{train_loss.item():.3f}\t{val_loss_str}\t{dt:.0f}\t{kt_s:.1f}\t{int(window)}\t{eta:.1f}")
     t0 = time.time()
 
+    # Checkpointing
+    if step > 0 and step % args.checkpoint_every == 0:
+        save_checkpoint(step, best_val_loss)
+
     if step == args.num_iterations:
         break
+
+# Save final checkpoint
+save_checkpoint(args.num_iterations, best_val_loss)
 
 elapsed = (time.time() - training_start) / 60
 print(f"\nTraining complete in {elapsed:.1f} minutes")
