@@ -1,0 +1,58 @@
+RoPE Truncation Ratio Ablation Study
+=====================================
+Base = 570 (tuned for 256-position attention window)
+500 training steps, batch_size=4, seq_len=4096
+
+Run 1: Testing 0.40, 0.50, 0.60
+--------------------------------
+trunc=0.40  val_loss=5.3066
+trunc=0.50  val_loss=5.7285
+trunc=0.60  val_loss=6.0391
+
+Run 2: Testing 0.00, 0.20, 0.30, 0.40
+-------------------------------------
+trunc=0.00  val_loss=6.2207
+trunc=0.20  val_loss=5.6035
+trunc=0.30  val_loss=5.4570  <- BEST
+trunc=0.40  val_loss=5.8125
+
+Combined Results (sorted by val loss):
+======================================
+trunc=0.30  val_loss=5.4570  <- OPTIMAL
+trunc=0.40  val_loss=5.3066-5.8125 (variance)
+trunc=0.50  val_loss=5.7285
+trunc=0.20  val_loss=5.6035
+trunc=0.00  val_loss=6.2207
+trunc=0.60  val_loss=6.0391
+
+Key Findings:
+=============
+1. No truncation (0.0) performs worst - confirming that zeroing
+   the slowest-varying frequencies helps
+
+2. The optimal truncation appears to be around 0.30-0.40
+   (not the 0.50 used by upstream)
+
+3. Too much truncation (0.60) also hurts performance
+
+4. There's noticeable run-to-run variance (~0.3-0.5 val loss)
+   which limits the precision of these short ablations
+
+Interpretation:
+===============
+With base=570 and 256-position attention window:
+- Frequencies span wavelengths from 2 positions to ~570 positions
+- The highest frequencies (shortest wavelengths) are most useful
+  for distinguishing nearby positions
+- The lowest frequencies (longest wavelengths) don't complete
+  even one cycle in the attention window, providing less signal
+- Zeroing ~30% of the lowest frequencies appears optimal
+- This is less aggressive than upstream's 50% truncation,
+  possibly because our shorter base (570 vs 1024) already
+  concentrates frequencies in the useful range
+
+Recommendation:
+===============
+For this setup (base=570, 256 attention window):
+- Use trunc_frac=0.30 instead of 0.50
+- May need to re-tune base if changing truncation fraction

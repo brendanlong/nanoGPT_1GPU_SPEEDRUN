@@ -1,0 +1,47 @@
+============================================================
+RoPE Ablation Study
+============================================================
+
+--- Testing: trunc=0.00 (base=570, trunc=0.0) ---
+/workspace/nanoGPT_1GPU_SPEEDRUN/rope_ablation.py:255: UserWarning: The given buffer is not writable, and PyTorch does not support non-writable tensors. This means you can write to the underlying (supposedly non-writable) buffer using the tensor. You may want to copy the buffer to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:1581.)
+  return torch.frombuffer(f.read(), dtype=torch.uint16)[256*2:]
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.875
+  Step 200/500, loss=6.312
+  Step 300/500, loss=6.062
+  Step 400/500, loss=6.438
+  Val loss: 6.2207, Time: 388.6s
+
+--- Testing: trunc=0.20 (base=570, trunc=0.2) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=8.812
+  Step 200/500, loss=6.781
+  Step 300/500, loss=7.094
+  Step 400/500, loss=6.469
+  Val loss: 5.6035, Time: 380.6s
+
+--- Testing: trunc=0.30 (base=570, trunc=0.3) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.781
+  Step 200/500, loss=6.781
+  Step 300/500, loss=6.281
+  Step 400/500, loss=6.281
+  Val loss: 5.4570, Time: 380.5s
+
+--- Testing: trunc=0.40 (base=570, trunc=0.4) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=8.938
+  Step 200/500, loss=6.812
+  Step 300/500, loss=6.844
+  Step 400/500, loss=8.938
+  Val loss: 5.8125, Time: 380.6s
+
+============================================================
+RESULTS SUMMARY
+============================================================
+Config                           Base  Trunc  ValLoss
+------------------------------------------------------------
+trunc=0.30                        570   0.30   5.4570
+trunc=0.20                        570   0.20   5.6035
+trunc=0.40                        570   0.40   5.8125
+trunc=0.00                        570   0.00   6.2207

@@ -1,0 +1,84 @@
+============================================================
+RoPE Ablation Study
+============================================================
+
+--- Testing: Standard RoPE (base=10000, trunc=0.0) ---
+/workspace/nanoGPT_1GPU_SPEEDRUN/rope_ablation.py:255: UserWarning: The given buffer is not writable, and PyTorch does not support non-writable tensors. This means you can write to the underlying (supposedly non-writable) buffer using the tensor. You may want to copy the buffer to protect its data or make it writable before converting it to a tensor. This type of warning will be suppressed for the rest of this program. (Triggered internally at /pytorch/torch/csrc/utils/tensor_new.cpp:1581.)
+  return torch.frombuffer(f.read(), dtype=torch.uint16)[256*2:]
+W0131 03:32:38.977000 7015 torch/_inductor/utils.py:1679] [3/0] Not enough SMs to use max_autotune_gemm mode
+  Step 0/500, loss=10.812
+  Step 100/500, loss=8.062
+  Step 200/500, loss=6.469
+  Step 300/500, loss=6.031
+  Step 400/500, loss=6.125
+  Val loss: 5.3184, Time: 427.5s
+
+--- Testing: Upstream (1024, 0.5) (base=1024, trunc=0.5) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.938
+  Step 200/500, loss=6.406
+  Step 300/500, loss=6.000
+  Step 400/500, loss=6.000
+  Val loss: 5.2148, Time: 380.5s
+
+--- Testing: 1.3 fix (787, 0.5) (base=787, trunc=0.5) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=8.438
+  Step 200/500, loss=6.375
+  Step 300/500, loss=6.031
+  Step 400/500, loss=6.062
+  Val loss: 5.3008, Time: 380.6s
+
+--- Testing: Tight fit (570, 0.5) (base=570, trunc=0.5) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.594
+  Step 200/500, loss=6.250
+  Step 300/500, loss=5.969
+  Step 400/500, loss=6.000
+  Val loss: 5.2090, Time: 380.5s
+
+--- Testing: No trunc (570, 0.0) (base=570, trunc=0.0) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.594
+  Step 200/500, loss=6.812
+  Step 300/500, loss=6.656
+  Step 400/500, loss=7.000
+  Val loss: 5.7910, Time: 380.2s
+
+--- Testing: Light trunc (570, 0.25) (base=570, trunc=0.25) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.688
+  Step 200/500, loss=6.281
+  Step 300/500, loss=7.781
+  Step 400/500, loss=6.250
+  Val loss: 5.4395, Time: 380.7s
+
+--- Testing: Very tight (285, 0.5) (base=285, trunc=0.5) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.750
+  Step 200/500, loss=6.469
+  Step 300/500, loss=6.062
+  Step 400/500, loss=6.188
+  Val loss: 5.3730, Time: 380.4s
+
+--- Testing: Very tight no trunc (285, 0.0) (base=285, trunc=0.0) ---
+  Step 0/500, loss=10.812
+  Step 100/500, loss=7.562
+  Step 200/500, loss=6.312
+  Step 300/500, loss=6.156
+  Step 400/500, loss=6.281
+  Val loss: 5.4062, Time: 380.3s
+
+============================================================
+RESULTS SUMMARY
+============================================================
+Config                           Base  Trunc  ValLoss
+------------------------------------------------------------
+Tight fit (570, 0.5)              570   0.50   5.2090
+Upstream (1024, 0.5)             1024   0.50   5.2148
+1.3 fix (787, 0.5)                787   0.50   5.3008
+Standard RoPE                   10000   0.00   5.3184
+Very tight (285, 0.5)             285   0.50   5.3730
+Very tight no trunc (285, 0.0)    285   0.00   5.4062
+Light trunc (570, 0.25)           570   0.25   5.4395
+No trunc (570, 0.0)               570   0.00   5.7910
